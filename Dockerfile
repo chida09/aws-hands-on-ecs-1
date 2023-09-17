@@ -1,4 +1,6 @@
-FROM ubuntu:18.04
+# https://qiita.com/sakai00kou/items/b83994c97d8d970a7d5b
+# FROM ubuntu:18.04
+FROM --platform=linux/amd64 ubuntu:18.04
 
 # Install dependencies
 RUN apt-get update && \
