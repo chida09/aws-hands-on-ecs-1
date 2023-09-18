@@ -1,5 +1,7 @@
 # aws-hands-on-ecs-1
-[Amazon ECS 入門ハンズオン](https://catalog.us-east-1.prod.workshops.aws/workshops/7ffc4ed9-d4b3-44dc-bade-676162b427cd/ja-JP)
+* このハンズオンはCloud9ではなく、Local環境で実行しようと試みたがECSからh4b-ecs-service のデプロイで失敗する
+* そのため、Local環境ではなくCloud9で作成すること
+* [Amazon ECS 入門ハンズオン](https://catalog.us-east-1.prod.workshops.aws/workshops/7ffc4ed9-d4b3-44dc-bade-676162b427cd/ja-JP)
 
 # 手順
 * Cloud9を使わずにLocal環境から実行する手順
@@ -44,8 +46,76 @@ aws ecr get-login-password {option}
 
 ## ECS の作成
 ### VPCの作成
-* VPCを[VPC など]から名前タグ[h4b-ecs]で、プライベートサブネットの数は[0]で作成する
-* セキュリティを選択し、インバウンドルールの編集を押下する
+* VPCを[VPC など]から名前タグ[h4b-ecs]で、プライベートサブネットの数は[0]にする
+* VPCを作成するを押下する
+* セキュリティグループを選択し、インバウンドルールの編集を押下する
 * ハンズオンで操作している端末のIPアドレスからのみアクセスできる制限を[HTTP]に入れる
 
 ### ECS クラスターの作成 
+ECS クラスターは、コンテナを動かすための論理的なグループです。ECS を操作するために、まずは ECS クラスターを作成していきます。
+* クラスター名[h4b-ecs-cluster]で作成する 
+
+### タスクの作成
+* サイドバーのタスク定義から新しいタスク定義を作成する
+* タスク定義ファミリー	h4b-ecs-task-definition
+
+コンテナ - 1 の作成
+```
+名前	apache-helloworld
+コンテナポート	80
+イメージ URI	<要変更>.dkr.ecr.ap-northeast-1.amazonaws.com/h4b-ecs-helloworld:0.0.1
+プロトコル	TCP
+ログ収集の使用	オフにする
+```
+
+### サービスの作成
+サービスとは、ECS 上でコンテナを動かすときに利用する概念の一つです。
+サービスを使用すると、 Amazon ECS クラスターで、指定した数のコンテナ群(タスク)を維持できます。
+```
+アプリケーションタイプ	サービス
+ファミリー	h4b-ecs-task-definition
+リビジョン	1 (最新)
+サービス名	h4b-ecs-service
+サービスタイプ	レプリカ
+必要なタスク	2
+ネットワーキング	h4b-ecs-vpc
+```
+
+次に、ロードバランサーに関するパラメータを入れます。
+```
+ロードバランサーの種類	Application Load Balancer
+Application Load Balancer	新しいロードバランサーの作成
+ロードバランサー名	h4b-ecs-alb
+ポート	80
+プロトコル	HTTP
+ターゲットグループ名	h4b-ecs-targetgroup
+プロトコル	HTTP
+```
+
+### 起動失敗時
+
+Amazon Elastic Container Service > クラスター > h4b-ecs-cluster > タスク > c3da67f8bd8648fd8c257387d2271988 > 設定で`Essential container in task exited`と出ていた。
+
+```
+❯ aws ecs list-tasks \
+  --profile aws-hands-on-user \
+  --cluster h4b-ecs-cluster \
+  --desired-status STOPPED
+```
+
+```
+❯ aws ecs describe-tasks \
+  --profile aws-hands-on-user \
+  --cluster h4b-ecs-cluster \
+  --tasks arn:aws:ecs:ap-northeast-1:980591565011:task/h4b-ecs-cluster/faa2cb00dd3649399a27f90ef250b8ae > ~/Desktop/ecs-error.json
+```
+[参考情報](https://codenote.net/aws/5384.html)
+  
+結論、docker buildする際に--platformオプションでCPUアーキテクチャを指定するかDockerfileのFROMでCPUアーキテクチャを指定することでビルド時に指定のCPUアーキテクチャでイメージを作成できた。
+
+
+### インターネットからアクセス
+* ブラウザでHello World! と表示されれば、正しくアクセスが出来ています。
+
+
+# 削除
